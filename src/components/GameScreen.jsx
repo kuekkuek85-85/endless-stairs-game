@@ -57,12 +57,13 @@ export default function GameScreen({ colorIndex, best, onGameOver, onQuit }) {
     let last = performance.now();
     let finished = false;
     const frame = (now) => {
-      const dt = Math.min((now - last) / 1000, 0.1);
+      // 게임 로직에는 실제 경과 시간을 그대로, 애니메이션 보간에만 상한을 둔다
+      const dt = Math.max(0, (now - last) / 1000);
       last = now;
       const events = update(game, dt);
       if (events.length) renderer.onEvents(events, game);
       if (events.includes('timeout')) playSound('timeout');
-      renderer.render(game, game.paused ? 0 : dt, { best: latest.current.best });
+      renderer.render(game, game.paused ? 0 : Math.min(dt, 0.1), { best: latest.current.best });
       if (events.includes('over') && !finished) {
         finished = true;
         latest.current.onGameOver({

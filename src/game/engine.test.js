@@ -5,6 +5,7 @@ import {
   GAUGE_RECOVER,
   KEEP_BEHIND,
   LEFT,
+  MAX_FRAME_DT,
   MAX_RUN,
   MIN_AHEAD,
   RIGHT,
@@ -186,11 +187,30 @@ describe('시간 게이지', () => {
     expect(game.overReason).toBe('timeout');
   });
 
-  it('큰 dt 한 번으로 게이지가 한꺼번에 사라지지 않음', () => {
+  it('느린 프레임(0.25초)도 실제 경과 시간을 모두 반영', () => {
     const game = createGame({ rng: seeded(1) });
     act(game, false);
-    update(game, 5);
-    expect(game.gauge).toBeGreaterThan(0.9);
+    update(game, 0.25);
+    expect(game.elapsed).toBeCloseTo(0.25, 5);
+    expect(game.gauge).toBeCloseTo(GAUGE_MAX - drainRate(1) * 0.25, 5);
+  });
+
+  it(`비정상적으로 긴 공백은 ${MAX_FRAME_DT}초까지만 반영`, () => {
+    const game = createGame({ rng: seeded(1) });
+    act(game, false);
+    update(game, 30);
+    expect(game.elapsed).toBeCloseTo(MAX_FRAME_DT, 5);
+    expect(game.status).toBe('playing');
+  });
+
+  it('긴 프레임 안에서도 시간 초과 순간을 정확히 판정', () => {
+    const game = createGame({ rng: seeded(1) });
+    act(game, false);
+    game.gauge = 0.01;
+    const events = update(game, 0.9);
+    expect(events).toContain('timeout');
+    // 시간 초과 이후 남은 시간은 낙하 연출로 넘어감
+    expect(game.elapsed).toBeLessThan(0.2);
   });
 
   it('일시정지 중에는 게이지·경과 시간·입력이 멈춤', () => {

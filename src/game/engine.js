@@ -24,7 +24,10 @@ export const GAUGE_WARNING = 0.3;
 export const MILESTONE_EVERY = 50;
 export const FALL_DURATION = 1.1; // 떨어지는 연출 시간(초) 후 게임 오버
 
-const MAX_DT = 0.1; // 프레임이 크게 밀려도 한 번에 게이지가 확 줄지 않도록
+const MAX_DT = 0.1; // 한 번에 계산하는 최대 시간 단위
+// 한 프레임에서 반영할 최대 시간. 느린 기기의 프레임 지연은 모두 반영하고,
+// 절전·백그라운드 복귀처럼 비정상적으로 긴 공백만 잘라낸다(보통은 자동 일시정지가 먼저 걸림).
+export const MAX_FRAME_DT = 1;
 
 export function speedLevel(score) {
   let level = 0;
@@ -141,11 +144,21 @@ export function act(state, turn) {
 }
 
 // 매 프레임 호출. dt 는 초 단위. 발생한 이벤트 목록 반환: 'timeout' | 'over'
+// 프레임이 늦어져도 실제 경과 시간을 모두 반영하되(게이지·부정 기록 검사의 기준),
+// 작은 단계로 나눠 계산해 시간 초과 순간을 정확히 판정한다.
 export function update(state, dt) {
   if (state.paused) return [];
-  const step = Math.min(Math.max(dt, 0), MAX_DT);
   const events = [];
+  let remaining = Math.min(Math.max(dt, 0), MAX_FRAME_DT);
+  while (remaining > 0 && state.status !== 'over') {
+    const step = Math.min(remaining, MAX_DT);
+    remaining -= step;
+    stepOnce(state, step, events);
+  }
+  return events;
+}
 
+function stepOnce(state, step, events) {
   if (state.status === 'playing') {
     state.elapsed += step;
     state.gauge = Math.max(0, state.gauge - drainRate(state.score) * step);
@@ -163,7 +176,6 @@ export function update(state, dt) {
       events.push('over');
     }
   }
-  return events;
 }
 
 export function setPaused(state, paused) {

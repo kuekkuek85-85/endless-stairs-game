@@ -46,6 +46,21 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
     await expectDenied(setDoc(ref, { ...base, extra: 1, updatedAt: serverTimestamp() }));
     await expectDenied(setDoc(doc(db, 'scores', 'abcde'), { ...base, studentId: 'abcde', updatedAt: serverTimestamp() }));
     await expectDenied(setDoc(ref, { ...base, studentId: '10302', updatedAt: serverTimestamp() }));
+    // 학번 범위 밖(학년·반·번호)과 학번과 다른 반은 거부
+    for (const bad of ['99999', '20301', '11601', '10300', '10341']) {
+      await expectDenied(
+        setDoc(doc(db, 'scores', bad), { ...base, studentId: bad, updatedAt: serverTimestamp() }),
+      );
+    }
+    await expectDenied(setDoc(ref, { ...base, class: 15, updatedAt: serverTimestamp() }));
+    await expectDenied(setDoc(ref, { ...base, class: 30, updatedAt: serverTimestamp() }));
+    // 두 자리 반도 학번에서 올바르게 파생되면 허용
+    await setDoc(doc(db, 'scores', '11501'), {
+      ...base,
+      studentId: '11501',
+      class: 15,
+      updatedAt: serverTimestamp(),
+    });
 
     await setDoc(ref, { ...base, updatedAt: serverTimestamp() });
     // playCount 를 건너뛰거나 bestScore 를 낮추거나 반을 바꿀 수 없음

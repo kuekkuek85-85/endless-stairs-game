@@ -12,10 +12,12 @@ service cloud.firestore {
         let d = request.resource.data;
         return d.keys().hasOnly(['studentId', 'name', 'class', 'bestScore', 'playCount', 'updatedAt'])
           && d.keys().hasAll(['studentId', 'name', 'class', 'bestScore', 'playCount', 'updatedAt'])
-          && studentId.matches('^[0-9]{5}$')
+          // 학번: 1학년(1) + 반(01~15) + 번호(01~40) — 클라이언트 검증과 같은 범위
+          && studentId.matches('^1(0[1-9]|1[0-5])(0[1-9]|[1-3][0-9]|40)$')
           && d.studentId == studentId
           && d.name is string && d.name.size() >= 1 && d.name.size() <= 10
-          && d['class'] is int && d['class'] >= 1 && d['class'] <= 15
+          // 반은 학번 2~3번째 자리에서 나온 값이어야 한다
+          && d['class'] is int && d['class'] == int(studentId[1:3])
           && d.bestScore is int && d.bestScore >= 0 && d.bestScore <= 3000
           && d.playCount is int && d.playCount >= 1
           && d.updatedAt == request.time;

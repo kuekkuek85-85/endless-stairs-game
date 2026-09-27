@@ -63,7 +63,8 @@ export default function App() {
     saveChain.current = saveChain.current.then(async () => {
       try {
         const r = await saveScore({ studentId: p.studentId, name: p.name, score });
-        setRemoteBest((b) => Math.max(b, r.bestScore));
+        // 저장이 끝나기 전에 다른 학생으로 바뀌었다면 그 학생의 최고 기록에 섞지 않는다
+        if (remoteLoadedFor.current === p.studentId) setRemoteBest((b) => Math.max(b, r.bestScore));
         update((s) => ({
           ...s,
           status: 'saved',
