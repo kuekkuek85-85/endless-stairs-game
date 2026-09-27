@@ -50,7 +50,7 @@ describe('학번 파생 값', () => {
     expect(classFromStudentId('11522')).toBe(15);
   });
   it('표시 이름', () => {
-    expect(displayName('10305', '홍길동')).toBe('103 홍길동');
+    expect(displayName('10305', '홍길동')).toBe('10305 홍길동');
   });
 });
 

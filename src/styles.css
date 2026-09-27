@@ -499,6 +499,41 @@ button {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  flex: 1;
+  font: inherit;
+  font-size: 1rem;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+.lookup-result {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px dashed var(--line);
+}
+
+.lookup-label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--accent-dark);
+  margin-bottom: 4px;
+}
+
 .class-select {
   font: inherit;
   font-weight: 700;

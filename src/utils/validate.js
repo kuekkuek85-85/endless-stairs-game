@@ -47,9 +47,9 @@ export function classFromStudentId(id) {
   return Number(String(id).slice(1, 3));
 }
 
-// 학번 앞 3자리 + 성명 (예: "103 홍길동")
+// 학번 5자리 + 성명 (예: "10305 홍길동")
 export function displayName(studentId, name) {
-  return `${String(studentId).slice(0, 3)} ${name}`;
+  return `${studentId} ${name}`;
 }
 
 // 한 판의 경과 시간 대비 계단 수가 사람이 누를 수 있는 속도인지 검사
