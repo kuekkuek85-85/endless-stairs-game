@@ -4,8 +4,17 @@
       "collectionGroup": "scores",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "bestScore", "order": "DESCENDING" },
+        { "fieldPath": "bestAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "class", "order": "ASCENDING" },
-        { "fieldPath": "bestScore", "order": "DESCENDING" }
+        { "fieldPath": "bestScore", "order": "DESCENDING" },
+        { "fieldPath": "bestAt", "order": "ASCENDING" }
       ]
     },
     {

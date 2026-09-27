@@ -10,8 +10,8 @@ service cloud.firestore {
       // 문서 형식 검사 (PRD 6. 부정 기록 최소 방어)
       function validDoc() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['studentId', 'name', 'class', 'bestScore', 'playCount', 'updatedAt'])
-          && d.keys().hasAll(['studentId', 'name', 'class', 'bestScore', 'playCount', 'updatedAt'])
+        return d.keys().hasOnly(['studentId', 'name', 'class', 'bestScore', 'bestAt', 'playCount', 'updatedAt'])
+          && d.keys().hasAll(['studentId', 'name', 'class', 'bestScore', 'bestAt', 'playCount', 'updatedAt'])
           // 학번: 1학년(1) + 반(01~15) + 번호(01~40) — 클라이언트 검증과 같은 범위
           && studentId.matches('^1(0[1-9]|1[0-5])(0[1-9]|[1-3][0-9]|40)$')
           && d.studentId == studentId
@@ -20,17 +20,25 @@ service cloud.firestore {
           && d['class'] is int && d['class'] >= 1 && d['class'] <= 15
           && studentId.matches('^1' + (d['class'] < 10 ? '0' : '') + string(d['class']) + '[0-9]{2}$')
           && d.bestScore is int && d.bestScore >= 0 && d.bestScore <= 3000
+          && d.bestAt is timestamp
           && d.playCount is int && d.playCount >= 1
           && d.updatedAt == request.time;
       }
 
-      allow create: if validDoc() && request.resource.data.playCount == 1;
+      // 첫 기록: 최고 기록 달성 시각은 지금
+      allow create: if validDoc()
+        && request.resource.data.playCount == 1
+        && request.resource.data.bestAt == request.time;
 
-      // 갱신은 한 판씩만: playCount +1, bestScore 는 줄어들 수 없음, 반은 바뀌지 않음
+      // 갱신은 한 판씩만: playCount +1, bestScore 는 줄어들 수 없음, 반은 바뀌지 않음.
+      // bestAt 은 최고 기록이 갱신될 때만 지금으로, 아니면 기존 최초 달성 시각을 유지해야 한다.
       allow update: if validDoc()
         && request.resource.data.playCount == resource.data.playCount + 1
         && request.resource.data.bestScore >= resource.data.bestScore
-        && request.resource.data['class'] == resource.data['class'];
+        && request.resource.data['class'] == resource.data['class']
+        && (request.resource.data.bestScore > resource.data.bestScore
+              ? request.resource.data.bestAt == request.time
+              : request.resource.data.bestAt == resource.data.bestAt);
 
       // 문서 삭제 금지
       allow delete: if false;
