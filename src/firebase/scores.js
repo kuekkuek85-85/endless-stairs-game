@@ -20,15 +20,20 @@ export async function saveScore({ studentId, name, score }) {
     const prevCount = prev && Number.isInteger(prev.playCount) ? prev.playCount : 0;
     const bestScore = Math.max(prevBest, safeScore);
     const playCount = prevCount + 1;
+    const isNewBest = safeScore > prevBest;
+    // 동점 시 먼저 달성한 사람이 위에 오도록, 최고 기록을 처음 세운 시각을 저장한다.
+    // 최고 기록이 갱신될 때만 갱신하고, 같은 최고 기록을 다시 쳐도 최초 달성 시각을 유지한다.
+    const bestAt = !isNewBest && prev && prev.bestAt ? prev.bestAt : serverTimestamp();
     tx.set(ref, {
       studentId,
       name,
       class: classFromStudentId(studentId),
       bestScore,
+      bestAt,
       playCount,
       updatedAt: serverTimestamp(),
     });
-    return { bestScore, playCount, previousBest: prevBest, isNewBest: safeScore > prevBest };
+    return { bestScore, playCount, previousBest: prevBest, isNewBest };
   });
 }
 
@@ -62,10 +67,17 @@ export function subscribeLeaderboard({ classNumber = null }, onData, onError) {
     .then(([db, { collection, query, where, orderBy, limit, onSnapshot }]) => {
       if (cancelled) return;
       const col = collection(db, COLLECTION);
+      // 최고 기록 내림차순, 동점이면 먼저 달성한 사람(bestAt 오름차순)이 위
       const q =
         classNumber == null
-          ? query(col, orderBy('bestScore', 'desc'), limit(30))
-          : query(col, where('class', '==', classNumber), orderBy('bestScore', 'desc'), limit(10));
+          ? query(col, orderBy('bestScore', 'desc'), orderBy('bestAt', 'asc'), limit(30))
+          : query(
+              col,
+              where('class', '==', classNumber),
+              orderBy('bestScore', 'desc'),
+              orderBy('bestAt', 'asc'),
+              limit(10),
+            );
       unsub = onSnapshot(
         q,
         (snap) => onData(snap.docs.map((d) => d.data())),
