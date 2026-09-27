@@ -11,6 +11,20 @@ async function expectDenied(promise) {
   await expect(promise).rejects.toMatchObject({ code: 'permission-denied' });
 }
 
+// 보안 규칙을 우회해 문서를 직접 심는다(에뮬레이터는 Bearer owner 로 관리자 쓰기 허용).
+// bestAt 이 없던 예전 문서를 재현하는 데 사용.
+async function seedRaw(studentId, fields) {
+  const host = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST;
+  const project = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  const url = `http://${host}/v1/projects/${project}/databases/(default)/documents/scores/${studentId}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) throw new Error(`seed 실패: ${res.status} ${await res.text()}`);
+}
+
 describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
   it('첫 판은 문서 생성, 이후 playCount +1, 최고 기록만 갱신', async () => {
     const id = '10101';
@@ -36,6 +50,28 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
     await saveScore({ studentId: id, name: '한결', score: 55 }); // 최고 기록 갱신
     const third = (await getDoc(doc(await getDb(), 'scores', id))).data().bestAt;
     expect(third.toMillis()).toBeGreaterThan(first.toMillis());
+  });
+
+  it('bestAt 이 없던 예전 문서도 다시 저장 가능(마이그레이션)', async () => {
+    const id = '10130';
+    // bestAt 없이 저장된 예전 문서를 재현
+    await seedRaw(id, {
+      studentId: { stringValue: id },
+      name: { stringValue: '홍길동' },
+      class: { integerValue: '1' },
+      bestScore: { integerValue: '42' },
+      playCount: { integerValue: '8' },
+      updatedAt: { timestampValue: '2026-09-27T13:45:46Z' },
+    });
+    // 최고 기록을 넘지 못한 판을 다시 저장 → 이전에는 규칙에 막혀 실패하던 케이스
+    const r = await saveScore({ studentId: id, name: '홍길동', score: 20 });
+    expect(r).toMatchObject({ bestScore: 42, playCount: 9, isNewBest: false });
+    const data = (await getDoc(doc(await getDb(), 'scores', id))).data();
+    expect(data.bestAt).toBeTruthy(); // 이제 bestAt 이 채워짐
+    // 이후 저장은 그 bestAt 을 유지
+    await saveScore({ studentId: id, name: '홍길동', score: 30 });
+    const data2 = (await getDoc(doc(await getDb(), 'scores', id))).data();
+    expect(data2.bestAt.isEqual(data.bestAt)).toBe(true);
   });
 
   it('동점이면 먼저 달성한 사람이 랭킹에서 위', async () => {
