@@ -19,3 +19,21 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  # Firestore 보안 규칙 + 저장 로직 통합 테스트 (에뮬레이터)
+  firestore-emulator:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:emulator

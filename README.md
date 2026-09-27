@@ -24,10 +24,9 @@ npm run build
 
 ### Firestore 에뮬레이터 테스트 (보안 규칙 + 저장 로직)
 
-Java와 firebase-tools가 필요합니다.
+Java(11 이상)가 필요합니다. firebase-tools 는 npx 로 자동 실행되며, CI 에서도 같은 테스트가 돕니다.
 
 ```bash
-npm i -g firebase-tools
 npm run test:emulator
 ```
 
