@@ -2,6 +2,14 @@
 const STUDENT_ID_RE = /^1(0[1-9]|1[0-5])(0[1-9]|[1-3][0-9]|40)$/;
 const NAME_RE = /^[가-힣]{2,5}$/;
 
+// 기록 상한 (Firestore 보안 규칙의 bestScore 상한과 같음)
+export const MAX_SCORE = 3000;
+
+// 화면·로컬 기록·서버 저장에 모두 같은 상한을 적용한다
+export function clampScore(score) {
+  return Math.max(0, Math.min(MAX_SCORE, Math.floor(score)));
+}
+
 // 사람이 누를 수 있는 최대 속도(초당 계단 수)
 export const MAX_STEPS_PER_SECOND = 12;
 // 첫 입력 직후처럼 경과 시간이 매우 짧을 때의 여유분

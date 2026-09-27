@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_SCORE,
+  clampScore,
   classFromStudentId,
   displayName,
   isPlausibleScore,
@@ -49,6 +51,16 @@ describe('학번 파생 값', () => {
   });
   it('표시 이름', () => {
     expect(displayName('10305', '홍길동')).toBe('103 홍길동');
+  });
+});
+
+describe('clampScore', () => {
+  it('0~3000 정수로 제한', () => {
+    expect(clampScore(214)).toBe(214);
+    expect(clampScore(3000)).toBe(3000);
+    expect(clampScore(3001)).toBe(MAX_SCORE);
+    expect(clampScore(-5)).toBe(0);
+    expect(clampScore(12.7)).toBe(12);
   });
 });
 

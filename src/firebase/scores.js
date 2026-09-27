@@ -1,11 +1,9 @@
 import { getDb, isFirebaseConfigured } from './config.js';
-import { classFromStudentId } from '../utils/validate.js';
+import { MAX_SCORE, clampScore, classFromStudentId } from '../utils/validate.js';
 
-export { isFirebaseConfigured };
+export { isFirebaseConfigured, MAX_SCORE };
 
 const COLLECTION = 'scores';
-export const MAX_SCORE = 3000;
-
 const firestore = () => import('firebase/firestore');
 
 // 학생별 문서 1개를 갱신: playCount +1, 최고 기록을 넘었을 때만 bestScore 갱신
@@ -13,7 +11,7 @@ export async function saveScore({ studentId, name, score }) {
   const db = await getDb();
   const { doc, runTransaction, serverTimestamp } = await firestore();
   const ref = doc(db, COLLECTION, studentId);
-  const safeScore = Math.max(0, Math.min(MAX_SCORE, Math.floor(score)));
+  const safeScore = clampScore(score);
 
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);

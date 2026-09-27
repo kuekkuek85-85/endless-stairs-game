@@ -12,7 +12,7 @@ import {
   saveLocalBest,
   saveProfile,
 } from './utils/storage.js';
-import { isPlausibleScore } from './utils/validate.js';
+import { clampScore, isPlausibleScore } from './utils/validate.js';
 import { CHARACTER_COLORS } from './game/renderer.js';
 
 export default function App() {
@@ -85,8 +85,10 @@ export default function App() {
   }, []);
 
   const handleGameOver = useCallback(
-    (r) => {
-      const plausible = isPlausibleScore(r.score, r.elapsedMs);
+    (raw) => {
+      // 부정 기록 검사는 실제 점수로, 이후 화면·로컬·서버에는 같은 상한을 적용한 점수를 쓴다
+      const plausible = isPlausibleScore(raw.score, raw.elapsedMs);
+      const r = { ...raw, score: clampScore(raw.score) };
       saveToken.current += 1; // 진행 중인 이전 판 저장 결과가 이 화면을 덮어쓰지 않도록
       setBestBefore(best);
       setResult(r);
