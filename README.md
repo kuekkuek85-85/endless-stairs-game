@@ -52,5 +52,4 @@ firestore.rules, firestore.indexes.json
 ## 개발 방식
 
 - 설계·구현: Claude Code
-- 코드 리뷰: PR 푸시마다 Codex(GitHub Action, `.github/workflows/codex-review.yml`)가 PR 댓글로 리뷰
-  - 저장소 **Settings → Secrets and variables → Actions** 에 `OPENAI_API_KEY` 등록 필요 (없으면 리뷰 단계는 건너뜀)
+- 코드 리뷰: GitHub에 연결된 Codex 앱이 PR 생성 시 자동 리뷰 (추가 리뷰는 PR 댓글에 `@codex review`)
