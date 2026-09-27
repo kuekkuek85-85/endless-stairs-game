@@ -1,0 +1,23 @@
+{
+  "name": "endless-stairs-game",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:emulator": "npx -y firebase-tools@15 emulators:exec --only firestore --project demo-endless-stairs \"VITE_FIREBASE_API_KEY=demo VITE_FIREBASE_PROJECT_ID=demo-endless-stairs VITE_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 vitest run src/firebase\""
+  },
+  "dependencies": {
+    "firebase": "^12.19.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
