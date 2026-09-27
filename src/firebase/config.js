@@ -21,7 +21,16 @@ export function getDb() {
   }
   if (!dbPromise) {
     dbPromise = Promise.all([import('firebase/app'), import('firebase/firestore')])
-      .then(([{ initializeApp }, { getFirestore }]) => getFirestore(initializeApp(firebaseConfig)))
+      .then(([{ initializeApp }, { getFirestore, connectFirestoreEmulator }]) => {
+        const db = getFirestore(initializeApp(firebaseConfig));
+        // 로컬 개발·테스트용 에뮬레이터 (예: VITE_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080)
+        const emulator = env.VITE_FIRESTORE_EMULATOR_HOST;
+        if (emulator) {
+          const [host, port] = emulator.split(':');
+          connectFirestoreEmulator(db, host, Number(port));
+        }
+        return db;
+      })
       .catch((err) => {
         dbPromise = null;
         throw err;
