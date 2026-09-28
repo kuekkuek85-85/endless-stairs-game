@@ -10,7 +10,9 @@ service cloud.firestore {
       // 문서 형식 검사 (PRD 6. 부정 기록 최소 방어)
       function validDoc() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['studentId', 'name', 'class', 'bestScore', 'bestAt', 'playCount', 'updatedAt'])
+        // coins 는 선택 필드: 예전 앱(coins 없이 저장)과 새 앱(coins 저장)을 모두 허용해
+        // 규칙과 앱 배포 순서에 상관없이 저장이 끊기지 않게 한다. 있으면 형식만 검증한다.
+        return d.keys().hasOnly(['studentId', 'name', 'class', 'bestScore', 'bestAt', 'coins', 'playCount', 'updatedAt'])
           && d.keys().hasAll(['studentId', 'name', 'class', 'bestScore', 'bestAt', 'playCount', 'updatedAt'])
           // 학번: 1학년(1) + 반(01~15) + 번호(01~40) — 클라이언트 검증과 같은 범위
           && studentId.matches('^1(0[1-9]|1[0-5])(0[1-9]|[1-3][0-9]|40)$')
@@ -21,6 +23,7 @@ service cloud.firestore {
           && studentId.matches('^1' + (d['class'] < 10 ? '0' : '') + string(d['class']) + '[0-9]{2}$')
           && d.bestScore is int && d.bestScore >= 0 && d.bestScore <= 3000
           && d.bestAt is timestamp
+          && (!('coins' in d) || (d.coins is int && d.coins >= 0 && d.coins <= 1000000))
           && d.playCount is int && d.playCount >= 1
           && d.updatedAt == request.time;
       }
@@ -30,13 +33,14 @@ service cloud.firestore {
         && request.resource.data.playCount == 1
         && request.resource.data.bestAt == request.time;
 
-      // 갱신은 한 판씩만: playCount +1, bestScore 는 줄어들 수 없음, 반은 바뀌지 않음.
+      // 갱신: bestScore 는 줄어들 수 없고, 반은 바뀌지 않는다.
+      // playCount 는 그대로(코인만 정산) 또는 +1(한 판 기록). 코인은 자유롭게 증감(로컬 화폐).
       // bestAt(최초 최고 기록 달성 시각):
       //  - 최고 기록이 갱신되면 지금
-      //  - 아니면 기존 값을 그대로 유지
-      //  - 단, bestAt 이 없던 예전 문서(마이그레이션)는 지금으로 기록하는 것을 허용
+      //  - 아니면 기존 값을 그대로 유지(없던 예전 문서는 지금으로 기록 허용)
       allow update: if validDoc()
-        && request.resource.data.playCount == resource.data.playCount + 1
+        && request.resource.data.playCount >= resource.data.playCount
+        && request.resource.data.playCount <= resource.data.playCount + 1
         && request.resource.data.bestScore >= resource.data.bestScore
         && request.resource.data['class'] == resource.data['class']
         && (request.resource.data.bestScore > resource.data.bestScore
