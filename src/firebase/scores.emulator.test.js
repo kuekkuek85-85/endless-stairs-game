@@ -120,12 +120,10 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
       setDoc(ref, { studentId: '10301', name: '최넷', class: 3, bestScore: 10, coins: 0, playCount: 1, updatedAt: serverTimestamp() }),
     );
     await expectDenied(setDoc(ref, { ...base, bestAt: 123, updatedAt: serverTimestamp() }));
-    // coins 가 없거나 범위를 벗어나면 거부
-    await expectDenied(
-      setDoc(ref, { studentId: '10301', name: '최넷', class: 3, bestScore: 10, playCount: 1, bestAt: serverTimestamp(), updatedAt: serverTimestamp() }),
-    );
+    // coins 는 선택 필드: 없어도 허용(예전 앱 호환), 있으면 범위 검증
     await expectDenied(setDoc(ref, { ...base, coins: -1, updatedAt: serverTimestamp() }));
     await expectDenied(setDoc(ref, { ...base, coins: 1000001, updatedAt: serverTimestamp() }));
+    await expectDenied(setDoc(ref, { ...base, coins: 1.5, updatedAt: serverTimestamp() }));
 
     await expectDenied(setDoc(ref, { ...base, bestScore: 3001, updatedAt: serverTimestamp() }));
     await expectDenied(setDoc(ref, { ...base, bestScore: 10.5, updatedAt: serverTimestamp() }));
@@ -147,6 +145,16 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
       ...base,
       studentId: '11501',
       class: 15,
+      updatedAt: serverTimestamp(),
+    });
+    // coins 없이 생성해도 허용(예전 앱 호환)
+    await setDoc(doc(db, 'scores', '10309'), {
+      studentId: '10309',
+      name: '옛앱',
+      class: 3,
+      bestScore: 5,
+      bestAt: serverTimestamp(),
+      playCount: 1,
       updatedAt: serverTimestamp(),
     });
 
