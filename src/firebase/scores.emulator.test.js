@@ -112,14 +112,20 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
 
   it('보안 규칙: 잘못된 형식·조작·삭제 거부', async () => {
     const db = await getDb();
-    const base = { studentId: '10301', name: '최넷', class: 3, bestScore: 10, playCount: 1, bestAt: serverTimestamp() };
+    const base = { studentId: '10301', name: '최넷', class: 3, bestScore: 10, coins: 0, playCount: 1, bestAt: serverTimestamp() };
     const ref = doc(db, 'scores', '10301');
 
     // bestAt 이 없거나 타입이 틀리면 거부
     await expectDenied(
-      setDoc(ref, { studentId: '10301', name: '최넷', class: 3, bestScore: 10, playCount: 1, updatedAt: serverTimestamp() }),
+      setDoc(ref, { studentId: '10301', name: '최넷', class: 3, bestScore: 10, coins: 0, playCount: 1, updatedAt: serverTimestamp() }),
     );
     await expectDenied(setDoc(ref, { ...base, bestAt: 123, updatedAt: serverTimestamp() }));
+    // coins 가 없거나 범위를 벗어나면 거부
+    await expectDenied(
+      setDoc(ref, { studentId: '10301', name: '최넷', class: 3, bestScore: 10, playCount: 1, bestAt: serverTimestamp(), updatedAt: serverTimestamp() }),
+    );
+    await expectDenied(setDoc(ref, { ...base, coins: -1, updatedAt: serverTimestamp() }));
+    await expectDenied(setDoc(ref, { ...base, coins: 1000001, updatedAt: serverTimestamp() }));
 
     await expectDenied(setDoc(ref, { ...base, bestScore: 3001, updatedAt: serverTimestamp() }));
     await expectDenied(setDoc(ref, { ...base, bestScore: 10.5, updatedAt: serverTimestamp() }));
@@ -157,6 +163,30 @@ describe.skipIf(!enabled)('Firestore 에뮬레이터', () => {
     );
     // 최고 기록 갱신 + bestAt 갱신은 허용
     await updateDoc(ref, { playCount: 2, bestScore: 20, bestAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    // playCount 를 그대로 두고 코인만 바꾸는 것은 허용(정산)
+    await updateDoc(ref, { coins: 50, updatedAt: serverTimestamp() });
     await expectDenied(deleteDoc(ref));
+  });
+
+  it('코인은 서버에 누적·소모되어 여러 기기에서 이어진다', async () => {
+    const id = '10108';
+    // 첫 판: 30칸 오르며 30코인
+    let r = await saveScore({ studentId: id, name: '코인', score: 30, earnedCoins: 30 });
+    expect(r).toMatchObject({ coins: 30, playCount: 1, bestScore: 30 });
+    // 둘째 판: 10칸 오르고(+10) 엘리베이터로 100 시작했다 치고 비용 100 소모 → 30+10-100 은 0 미만이라 0
+    r = await saveScore({ studentId: id, name: '코인', score: 40, earnedCoins: 10, spentCoins: 100 });
+    expect(r.coins).toBe(0);
+    // 셋째 판: 200칸 오르며 +200 → 200
+    r = await saveScore({ studentId: id, name: '코인', score: 200, earnedCoins: 200 });
+    expect(r.coins).toBe(200);
+    // 넷째 판: 부정 기록(recordScore=false)이어도 코인은 정산되고 기록/판수는 그대로
+    const before = (await getDoc(doc(await getDb(), 'scores', id))).data();
+    r = await saveScore({ studentId: id, name: '코인', score: 999, earnedCoins: 5, recordScore: false });
+    expect(r.coins).toBe(205);
+    expect(r.bestScore).toBe(before.bestScore); // 기록 그대로
+    expect(r.playCount).toBe(before.playCount); // 판수 그대로
+
+    const data = (await getDoc(doc(await getDb(), 'scores', id))).data();
+    expect(data.coins).toBe(205);
   });
 });

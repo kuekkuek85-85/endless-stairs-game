@@ -3,11 +3,19 @@ import { MAX_SCORE, clampScore, classFromStudentId } from '../utils/validate.js'
 
 export { isFirebaseConfigured, MAX_SCORE };
 
+export const MAX_COINS = 1_000_000; // 코인 상한 (보안 규칙과 동일)
+
 const COLLECTION = 'scores';
 const firestore = () => import('firebase/firestore');
 
-// 학생별 문서 1개를 갱신: playCount +1, 최고 기록을 넘었을 때만 bestScore 갱신
-export async function saveScore({ studentId, name, score }) {
+const clampCoins = (n) => Math.max(0, Math.min(MAX_COINS, Math.floor(n)));
+
+// 게임 오버 시 한 번 호출: 서버 문서를 정산한다.
+//  - 코인: 이번 판에 모은 코인(earnedCoins)을 더하고, 엘리베이터 비용(spentCoins)을 뺀다.
+//  - recordScore=true 이면 playCount +1, 최고 기록/최초 달성 시각 갱신.
+//    (부정 기록 등으로 false 이면 기록은 그대로 두고 코인만 정산)
+// 코인은 서버에 저장되어 여러 기기에서 이어진다.
+export async function saveScore({ studentId, name, score, earnedCoins = 0, spentCoins = 0, recordScore = true }) {
   const db = await getDb();
   const { doc, runTransaction, serverTimestamp } = await firestore();
   const ref = doc(db, COLLECTION, studentId);
@@ -18,22 +26,30 @@ export async function saveScore({ studentId, name, score }) {
     const prev = snap.exists() ? snap.data() : null;
     const prevBest = prev && Number.isInteger(prev.bestScore) ? prev.bestScore : 0;
     const prevCount = prev && Number.isInteger(prev.playCount) ? prev.playCount : 0;
-    const bestScore = Math.max(prevBest, safeScore);
-    const playCount = prevCount + 1;
-    const isNewBest = safeScore > prevBest;
+    const prevCoins = prev && Number.isInteger(prev.coins) ? prev.coins : 0;
+
+    const coins = clampCoins(prevCoins + earnedCoins - spentCoins);
+    const isNewBest = recordScore && safeScore > prevBest;
+    const bestScore = recordScore ? Math.max(prevBest, safeScore) : prevBest;
+    const playCount = recordScore ? prevCount + 1 : prevCount;
     // 동점 시 먼저 달성한 사람이 위에 오도록, 최고 기록을 처음 세운 시각을 저장한다.
-    // 최고 기록이 갱신될 때만 갱신하고, 같은 최고 기록을 다시 쳐도 최초 달성 시각을 유지한다.
+    // 최고 기록이 갱신될 때만 갱신하고, 그 외에는 기존 값을 유지(없던 예전 문서는 지금).
     const bestAt = !isNewBest && prev && prev.bestAt ? prev.bestAt : serverTimestamp();
+
+    // 첫 문서(create)는 반드시 playCount>=1 이어야 하므로 최소 1로 만든다
+    const finalCount = snap.exists() ? playCount : Math.max(1, playCount);
+
     tx.set(ref, {
       studentId,
       name,
       class: classFromStudentId(studentId),
       bestScore,
       bestAt,
-      playCount,
+      coins,
+      playCount: finalCount,
       updatedAt: serverTimestamp(),
     });
-    return { bestScore, playCount, previousBest: prevBest, isNewBest };
+    return { bestScore, playCount: finalCount, previousBest: prevBest, isNewBest, coins };
   });
 }
 

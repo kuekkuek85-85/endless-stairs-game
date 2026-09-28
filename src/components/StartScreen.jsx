@@ -1,22 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import CharacterPreview from './CharacterPreview.jsx';
 import { CHARACTER_COLORS, CHARACTER_COLOR_NAMES } from '../game/renderer.js';
 import { elevatorCost, elevatorFloors } from '../game/engine.js';
 import { validateName, validateStudentId } from '../utils/validate.js';
-import { loadCoins, loadLocalBest } from '../utils/storage.js';
+import { fetchMyRecord, isFirebaseConfigured } from '../firebase/scores.js';
+import { loadCoins, loadLocalBest, saveCoins, saveLocalBest } from '../utils/storage.js';
 import { isMuted, setMuted, unlockAudio } from '../utils/sound.js';
 
-export default function StartScreen({ profile, colorIndex, best = 0, onColorChange, onStart, onRanking, onSwitchUser }) {
+export default function StartScreen({ profile, colorIndex, best = 0, coins: coinsProp = 0, onColorChange, onStart, onRanking, onSwitchUser }) {
   const [studentId, setStudentId] = useState(profile?.studentId ?? '');
   const [name, setName] = useState(profile?.name ?? '');
   const [errors, setErrors] = useState({});
   const [muted, setMutedUi] = useState(isMuted());
   const [elevatorFloor, setElevatorFloor] = useState(0); // 0 = 처음부터(1층)
+  const [remote, setRemote] = useState(null); // 입력한 학번의 서버 기록 { studentId, best, coins }
 
-  // 입력한 학번의 로컬 기록·코인을 본다(다른 학생으로 새로 입력하는 경우도 반영)
   const typed = validateStudentId(studentId);
-  const effectiveBest = Math.max(best, typed.ok ? loadLocalBest(typed.value) : 0);
-  const coins = typed.ok ? loadCoins(typed.value) : 0;
+
+  // 학번을 입력하면 그 학번의 서버 기록(코인·최고 기록)을 불러온다 → 다른 기기에서도 이어짐.
+  // 불러온 값은 로컬 캐시에도 저장해 게임 시작 시 엘리베이터 결제 판정과 일치시킨다.
+  useEffect(() => {
+    if (!isFirebaseConfigured || !typed.ok) {
+      setRemote(null);
+      return undefined;
+    }
+    const id = typed.value;
+    let cancelled = false;
+    fetchMyRecord(id)
+      .then((rec) => {
+        if (cancelled || !rec) return;
+        const coins = Number.isInteger(rec.coins) ? rec.coins : 0;
+        const b = Number.isInteger(rec.bestScore) ? rec.bestScore : 0;
+        saveCoins(id, coins);
+        saveLocalBest(id, b);
+        setRemote({ studentId: id, coins, best: b });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [typed.ok, typed.value]);
+
+  const isCurrent = typed.ok && typed.value === profile?.studentId;
+  const remoteForTyped = remote && typed.ok && remote.studentId === typed.value ? remote : null;
+  const effectiveBest = Math.max(best, typed.ok ? loadLocalBest(typed.value) : 0, remoteForTyped?.best ?? 0);
+  const coins = remoteForTyped ? remoteForTyped.coins : isCurrent ? coinsProp : typed.ok ? loadCoins(typed.value) : 0;
   const floors = elevatorFloors(effectiveBest); // 이용 가능한 엘리베이터 시작 층 (200,400,...)
   const canAfford = (floor) => coins >= elevatorCost(floor);
   // 선택한 층이 더 이상 이용 불가·코인 부족이면 처음부터로 되돌린다
