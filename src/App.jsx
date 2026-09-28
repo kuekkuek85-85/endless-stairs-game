@@ -5,6 +5,7 @@ import GameOver from './components/GameOver.jsx';
 import Leaderboard from './components/Leaderboard.jsx';
 import { fetchMyRecord, fetchRanks, isFirebaseConfigured, saveScore } from './firebase/scores.js';
 import {
+  changeCoins,
   loadColorIndex,
   loadLocalBest,
   loadProfile,
@@ -13,6 +14,7 @@ import {
   saveProfile,
 } from './utils/storage.js';
 import { clampScore, isPlausibleScore } from './utils/validate.js';
+import { elevatorCost } from './game/engine.js';
 import { CHARACTER_COLORS } from './game/renderer.js';
 
 export default function App() {
@@ -25,13 +27,21 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [bestBefore, setBestBefore] = useState(0);
   const [save, setSave] = useState(null);
+  const [startFloor, setStartFloor] = useState(0); // 엘리베이터 시작 층 (다시 하기 때 유지)
   const remoteLoadedFor = useRef(null);
   const saveChain = useRef(Promise.resolve());
   const saveToken = useRef(0);
 
   const best = profile ? Math.max(loadLocalBest(profile.studentId), remoteBest) : 0;
 
-  const start = (p) => {
+  const start = (p, floor = startFloor) => {
+    // 엘리베이터: 코인이 충분할 때만 시작 층을 적용하고 비용만큼 코인을 쓴다
+    let useFloor = 0;
+    if (floor > 0 && changeCoins(p.studentId, 0) >= elevatorCost(floor)) {
+      changeCoins(p.studentId, -elevatorCost(floor));
+      useFloor = floor;
+    }
+    setStartFloor(useFloor);
     if (remoteLoadedFor.current !== p.studentId) {
       setRemoteBest(0);
       remoteLoadedFor.current = p.studentId;
@@ -86,8 +96,10 @@ export default function App() {
 
   const handleGameOver = useCallback(
     (raw) => {
-      // 부정 기록 검사는 실제 점수로, 이후 화면·로컬·서버에는 같은 상한을 적용한 점수를 쓴다
-      const plausible = isPlausibleScore(raw.score, raw.elapsedMs);
+      // 부정 기록 검사는 "실제로 오른 칸(엘리베이터 시작 층 제외)"만 본다.
+      // 이후 화면·로컬·서버에는 같은 상한을 적용한 점수를 쓴다.
+      const climbed = Math.max(0, raw.score - (raw.startFloor || 0));
+      const plausible = isPlausibleScore(climbed, raw.elapsedMs);
       const r = { ...raw, score: clampScore(raw.score) };
       saveToken.current += 1; // 진행 중인 이전 판 저장 결과가 이 화면을 덮어쓰지 않도록
       setBestBefore(best);
@@ -98,6 +110,9 @@ export default function App() {
         ranks: null,
         isNewBest: plausible && r.score > 0 && r.score > best,
       });
+      // 계단을 오르며 모은 코인을 지갑에 넣는다(부정 기록이어도 코인은 지급, 로컬 전용)
+      const earned = Number.isInteger(raw.coins) ? raw.coins : 0;
+      if (earned > 0) changeCoins(profile.studentId, earned);
       setScreen('over');
       if (!plausible) return;
       saveLocalBest(profile.studentId, r.score);
@@ -117,6 +132,7 @@ export default function App() {
         <StartScreen
           profile={profile}
           colorIndex={colorIndex}
+          best={best}
           onColorChange={(i) => {
             setColorIndex(i);
             saveColorIndex(i);
@@ -136,6 +152,7 @@ export default function App() {
           key={round}
           colorIndex={colorIndex}
           best={best}
+          startFloor={startFloor}
           onGameOver={handleGameOver}
           onQuit={() => setScreen('start')}
         />

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COINS_PER_STEP,
+  ELEVATOR_STEP,
   FALL_DURATION,
   GAUGE_MAX,
   GAUGE_RECOVER,
@@ -8,11 +10,14 @@ import {
   MAX_FRAME_DT,
   MAX_RUN,
   MIN_AHEAD,
+  MILESTONE_EVERY,
   RIGHT,
   WARMUP_STEPS,
   act,
   createGame,
   drainRate,
+  elevatorCost,
+  elevatorFloors,
   getStair,
   lastIndex,
   setPaused,
@@ -95,6 +100,74 @@ describe('계단 생성', () => {
     expect(lastIndex(game) - game.pos).toBeGreaterThanOrEqual(MIN_AHEAD);
     expect(game.pos - game.base).toBeLessThanOrEqual(KEEP_BEHIND);
     expect(game.stairs.length).toBeLessThanOrEqual(KEEP_BEHIND + MIN_AHEAD + 2);
+  });
+});
+
+describe('엘리베이터 시작', () => {
+  it('startFloor 만큼 점수·위치를 건너뛰고 시작(게임 오버 없음)', () => {
+    const game = createGame({ rng: seeded(5), startFloor: ELEVATOR_STEP });
+    expect(game.score).toBe(ELEVATOR_STEP);
+    expect(game.pos).toBe(ELEVATOR_STEP);
+    expect(game.startFloor).toBe(ELEVATOR_STEP);
+    expect(game.status).toBe('ready');
+    expect(game.gauge).toBe(GAUGE_MAX);
+    // 앞쪽 계단이 충분히 생성돼 있어야 한다
+    expect(lastIndex(game) - game.pos).toBeGreaterThanOrEqual(MIN_AHEAD);
+  });
+
+  it('시작 지점에서 올바른 입력이 항상 존재하고 이어서 오를 수 있다', () => {
+    const game = createGame({ rng: seeded(6), startFloor: ELEVATOR_STEP });
+    climbPerfectly(game, 30);
+    expect(game.score).toBe(ELEVATOR_STEP + 30);
+    expect(game.status).toBe('playing');
+  });
+
+  it('첫 입력 전에는 게이지가 멈춰 있다(엘리베이터 착지 직후)', () => {
+    const game = createGame({ rng: seeded(7), startFloor: ELEVATOR_STEP });
+    update(game, 0.5);
+    expect(game.gauge).toBe(GAUGE_MAX);
+  });
+
+  it('이미 지나온 층의 마일스톤은 다시 울리지 않는다', () => {
+    const game = createGame({ rng: seeded(8), startFloor: ELEVATOR_STEP });
+    const events = [];
+    const target = ELEVATOR_STEP + MILESTONE_EVERY;
+    while (game.score < target) events.push(...act(game, correctTurn(game)));
+    const milestoneCount = events.filter((e) => e === 'milestone').length;
+    expect(milestoneCount).toBe(1); // 다음 마일스톤 한 번만, 시작 층은 울리지 않음
+  });
+
+  it('시작 층부터 시작하면 그만큼의 코인은 얻지 않는다(실제 오른 칸만)', () => {
+    const game = createGame({ rng: seeded(4), startFloor: ELEVATOR_STEP });
+    climbPerfectly(game, 15);
+    expect(game.coins).toBe(15 * COINS_PER_STEP);
+  });
+
+  it('startFloor 가 없으면 기존과 동일하게 0층에서 시작', () => {
+    const game = createGame({ rng: seeded(9) });
+    expect(game.score).toBe(0);
+    expect(game.startFloor).toBe(0);
+    expect(game.coins).toBe(0);
+  });
+});
+
+describe('코인·엘리베이터 비용', () => {
+  it('계단을 오를 때마다 코인을 얻는다', () => {
+    const game = createGame({ rng: seeded(2) });
+    climbPerfectly(game, 10);
+    expect(game.coins).toBe(10 * COINS_PER_STEP);
+  });
+
+  it('엘리베이터 시작 층은 200 단위, 최고 기록 이하만', () => {
+    expect(elevatorFloors(0)).toEqual([]);
+    expect(elevatorFloors(199)).toEqual([]);
+    expect(elevatorFloors(200)).toEqual([200]);
+    expect(elevatorFloors(650)).toEqual([200, 400, 600]);
+  });
+
+  it('비용은 건너뛰는 층에 비례', () => {
+    expect(elevatorCost(200)).toBe(200);
+    expect(elevatorCost(400)).toBe(400);
   });
 });
 
