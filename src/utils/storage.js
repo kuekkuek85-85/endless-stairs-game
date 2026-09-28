@@ -54,3 +54,20 @@ export function loadLocalBest(studentId) {
 export function saveLocalBest(studentId, score) {
   if (score > loadLocalBest(studentId)) write(`best.${studentId}`, score);
 }
+
+// 코인: 계단을 오를 때마다 모으고, 엘리베이터를 탈 때 쓴다 (학생별 지갑)
+export function loadCoins(studentId) {
+  const v = read(`coins.${studentId}`, 0);
+  return Number.isInteger(v) && v > 0 ? v : 0;
+}
+
+export function saveCoins(studentId, coins) {
+  write(`coins.${studentId}`, Math.max(0, Math.floor(coins)));
+}
+
+// 코인을 더하거나(양수) 쓰고(음수) 남은 코인을 반환. 음수로 내려가지 않는다.
+export function changeCoins(studentId, delta) {
+  const next = Math.max(0, loadCoins(studentId) + Math.floor(delta));
+  saveCoins(studentId, next);
+  return next;
+}

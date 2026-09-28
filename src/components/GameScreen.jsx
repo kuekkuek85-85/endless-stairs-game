@@ -7,7 +7,7 @@ import { isMuted, playSound, setMuted } from '../utils/sound.js';
 
 // 게임 로직(engine)은 입력 즉시 처리하고, 렌더링(renderer)은 requestAnimationFrame 에서만 한다.
 // 매 프레임 바뀌는 값(점수·게이지)은 캔버스에 그려 React 리렌더를 만들지 않는다.
-export default function GameScreen({ colorIndex, best, onGameOver, onQuit }) {
+export default function GameScreen({ colorIndex, best, startFloor = 0, onGameOver, onQuit }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const screenRef = useRef(null);
@@ -42,7 +42,7 @@ export default function GameScreen({ colorIndex, best, onGameOver, onQuit }) {
   }, []);
 
   useEffect(() => {
-    const game = createGame();
+    const game = createGame({ startFloor });
     gameRef.current = game;
     if (import.meta.env.DEV) window.__game = game; // 개발 중 디버깅용
     const renderer = createRenderer(canvasRef.current, {
@@ -68,6 +68,8 @@ export default function GameScreen({ colorIndex, best, onGameOver, onQuit }) {
         finished = true;
         latest.current.onGameOver({
           score: game.score,
+          startFloor: game.startFloor,
+          coins: game.coins,
           elapsedMs: Math.round(game.elapsed * 1000),
           reason: game.overReason,
         });
@@ -94,7 +96,7 @@ export default function GameScreen({ colorIndex, best, onGameOver, onQuit }) {
       gameRef.current = null;
       rendererRef.current = null;
     };
-  }, [colorIndex, handleAction, pause]);
+  }, [colorIndex, startFloor, handleAction, pause]);
 
   const toggleMute = () => {
     setMuted(!muted);

@@ -24,6 +24,28 @@ export const GAUGE_WARNING = 0.3;
 export const MILESTONE_EVERY = 50;
 export const FALL_DURATION = 1.1; // 떨어지는 연출 시간(초) 후 게임 오버
 
+// 코인: 계단을 한 칸 오를 때마다 얻는다
+export const COINS_PER_STEP = 1;
+
+// 엘리베이터 (무한의 계단의 엘리베이터): 200층 단위로 시작 지점을 살 수 있다.
+// 최고 기록으로 올라가 본 층(200의 배수)까지 코인을 내고 그 층부터 시작한다.
+// 착지 직후에는 게이지가 멈춰 있다(= 'ready' 상태).
+// 주의: 시작 층은 기록 자체에 포함되지만, 부정 기록 검사는 "실제로 오른 칸(score - startFloor)"만 본다.
+export const ELEVATOR_STEP = 200; // 엘리베이터 시작 층 간격(첫 정거장 200층)
+export const ELEVATOR_COST_PER_FLOOR = 1; // 건너뛰는 층 1칸당 코인 비용
+
+// 시작하려는 층의 코인 비용
+export function elevatorCost(floor) {
+  return Math.max(0, Math.floor(floor)) * ELEVATOR_COST_PER_FLOOR;
+}
+
+// 최고 기록으로 이용 가능한 엘리베이터 시작 층 목록 (200, 400, ... ≤ best)
+export function elevatorFloors(best) {
+  const floors = [];
+  for (let f = ELEVATOR_STEP; f <= best; f += ELEVATOR_STEP) floors.push(f);
+  return floors;
+}
+
 const MAX_DT = 0.1; // 한 번에 계산하는 최대 시간 단위
 // 한 프레임에서 반영할 최대 시간. 느린 기기의 프레임 지연은 모두 반영하고,
 // 절전·백그라운드 복귀처럼 비정상적으로 긴 공백만 잘라낸다(보통은 자동 일시정지가 먼저 걸림).
@@ -46,7 +68,7 @@ export function nextDirection(prevDir, runLength, index, rng) {
   return rng() < chance ? -prevDir : prevDir;
 }
 
-export function createGame({ rng = Math.random } = {}) {
+export function createGame({ rng = Math.random, startFloor = 0 } = {}) {
   const state = {
     rng,
     // stairs[k] 는 계단 번호 base + k
@@ -57,6 +79,8 @@ export function createGame({ rng = Math.random } = {}) {
     pos: 0,
     facing: RIGHT,
     score: 0,
+    coins: 0, // 이번 판에 계단을 오르며 모은 코인
+    startFloor: 0, // 엘리베이터로 건너뛴 시작 층 (부정 기록 검사에서 제외)
     gauge: GAUGE_MAX,
     status: 'ready', // ready → playing → falling → over
     overReason: null, // 'fall' | 'timeout'
@@ -69,7 +93,25 @@ export function createGame({ rng = Math.random } = {}) {
   // 첫 칸은 시작 방향(오른쪽)과 같게 두어 첫 [오르기]가 항상 성공
   appendStair(state, RIGHT);
   fillAhead(state);
+  if (startFloor > 0) elevatorTo(state, Math.floor(startFloor));
   return state;
+}
+
+// 엘리베이터로 특정 층까지 즉시 이동. 계단 경로는 이미 결정적으로 생성돼 있으므로
+// 그 위의 정확한 지점에 캐릭터를 올려놓기만 한다(게임 오버 없이).
+function elevatorTo(state, floor) {
+  while (lastIndex(state) < floor + MIN_AHEAD) {
+    const index = lastIndex(state) + 1;
+    appendStair(state, nextDirection(state.lastDir, state.runLength, index, state.rng));
+  }
+  state.pos = floor;
+  state.score = floor;
+  state.startFloor = floor;
+  // 캐릭터가 바라보는 방향 = 이 층으로 올라온 이동 방향
+  state.facing = getStair(state, floor).dir || RIGHT;
+  // 이미 지나온 층의 마일스톤은 다시 울리지 않도록
+  state.lastMilestone = Math.floor(floor / MILESTONE_EVERY) * MILESTONE_EVERY;
+  prune(state);
 }
 
 function appendStair(state, dir) {
@@ -130,6 +172,7 @@ export function act(state, turn) {
 
   state.pos += 1;
   state.score += 1;
+  state.coins += COINS_PER_STEP;
   state.gauge = Math.min(GAUGE_MAX, state.gauge + GAUGE_RECOVER);
   if (!turn) events.push('climb');
 

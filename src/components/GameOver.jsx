@@ -1,9 +1,26 @@
+import { useEffect } from 'react';
+
 // 게임 오버 화면 (표시 전용). 저장은 App 에서 게임 오버 순간 한 번만 실행한다.
 // save.status: saving | saved | error | offline(서버 설정 없음) | rejected(비정상 기록)
 export default function GameOver({ result, save, bestBefore, onRetrySave, onRetry, onRanking, onHome }) {
-  const { score, reason } = result;
+  const { score, reason, coins } = result;
   const { status, serverBest, ranks, isNewBest } = save;
   const best = Math.max(bestBefore, serverBest ?? 0, status === 'rejected' ? 0 : score);
+  const earned = Number.isInteger(coins) ? coins : 0;
+
+  // PC: 스페이스바(또는 Enter)로 바로 다시 하기
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') {
+        e.preventDefault();
+        onRetry();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onRetry]);
 
   return (
     <main className="screen scroll">
@@ -15,6 +32,7 @@ export default function GameOver({ result, save, bestBefore, onRetrySave, onRetr
           <div className="label">이번 기록</div>
           <div className="value">{score}</div>
           {isNewBest && <div className="new-best">NEW BEST!</div>}
+          {earned > 0 && <div className="coins-earned">🪙 +{earned} 코인</div>}
         </div>
         <div className="stats">
           <div className="stat">
@@ -55,6 +73,9 @@ export default function GameOver({ result, save, bestBefore, onRetrySave, onRetr
           🏆 랭킹 보기
         </button>
       </div>
+      <p className="hint" style={{ margin: '6px 0 0' }}>
+        스페이스바를 누르면 바로 다시 시작해요
+      </p>
       <button type="button" className="link-btn" onClick={onHome}>
         처음 화면으로
       </button>
