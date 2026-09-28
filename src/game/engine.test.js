@@ -158,15 +158,15 @@ describe('코인·엘리베이터 비용', () => {
     expect(game.coins).toBe(10 * COINS_PER_STEP);
   });
 
-  it('엘리베이터 시작 층은 200 단위, 최고 기록 이하만', () => {
+  it('엘리베이터 시작 층은 100 단위, 최고 기록 이하만', () => {
     expect(elevatorFloors(0)).toEqual([]);
-    expect(elevatorFloors(199)).toEqual([]);
-    expect(elevatorFloors(200)).toEqual([200]);
-    expect(elevatorFloors(650)).toEqual([200, 400, 600]);
+    expect(elevatorFloors(99)).toEqual([]);
+    expect(elevatorFloors(100)).toEqual([100]);
+    expect(elevatorFloors(650)).toEqual([100, 200, 300, 400, 500, 600]);
   });
 
   it('비용은 건너뛰는 층에 비례', () => {
-    expect(elevatorCost(200)).toBe(200);
+    expect(elevatorCost(100)).toBe(100);
     expect(elevatorCost(400)).toBe(400);
   });
 });
