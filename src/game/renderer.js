@@ -309,8 +309,8 @@ export function createRenderer(canvas, { color = CHARACTER_COLORS[0] } = {}) {
   }
 
   function drawStairs(game, theme, m, toScreen) {
-    const sw = m.unitX * 1.12;
-    const sh = m.unitY * 0.5;
+    const sw = m.unitX * 1.32; // 벽돌 폭 (살짝 더 크게)
+    const sh = m.unitY * 0.64; // 벽돌 높이 (살짝 더 두껍게)
     const from = Math.max(game.base, game.pos - 10);
     const to = Math.min(game.base + game.stairs.length - 1, game.pos + VISIBLE_AHEAD + 4);
     const top = rgb(theme.edge);

@@ -124,11 +124,18 @@ export default function StartScreen({ profile, colorIndex, best = 0, coins: coin
           {errors.name && <p className="error">{errors.name}</p>}
         </div>
 
+        {/* 학번을 입력하면(로그인) 그 계정의 누적 코인을 항상 보여 준다 */}
+        {typed.ok && (
+          <div className="coin-balance">
+            <span>🪙 보유 코인</span>
+            <b>{coins}</b>
+          </div>
+        )}
+
         {floors.length > 0 && (
           <div className="elevator">
             <div className="elevator-head">
               <span>🛗 엘리베이터</span>
-              <span className="coins">🪙 {coins}</span>
             </div>
             <div className="elevator-floors">
               <button
